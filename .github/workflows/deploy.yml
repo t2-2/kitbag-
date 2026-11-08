@@ -1,0 +1,28 @@
+name: deploy-convex
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_BOOT: ${{ secrets.KITBAG_BOOTSTRAP_USER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install
+      - name: Deploy Convex functions
+        run: npx convex deploy --typecheck=disable --yes
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+      - name: Set bootstrap commander (first run only; safe to repeat)
+        if: env.HAS_BOOT != ''
+        run: |
+          npx convex env set KITBAG_BOOTSTRAP_USER "$U"
+          npx convex env set KITBAG_BOOTSTRAP_PASSWORD "$P"
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+          U: ${{ secrets.KITBAG_BOOTSTRAP_USER }}
+          P: ${{ secrets.KITBAG_BOOTSTRAP_PASSWORD }}
