@@ -40,3 +40,8 @@ export const loginCadet = action({ args: { idNumber: v.string(), code: v.string(
     await ctx.runMutation(internal.authDb.clearFails, { key });
     return { token: await open(ctx, "cadet", { cadetId: c!._id }, c!.idNumber), role: "cadet" as const };
   } });
+export const issueCadetCode = action({ args: { token: v.string(), cadetId: v.id("cadets") }, handler: async (ctx, a) => {
+  const actor = await ctx.runQuery(internal.authDb.commanderName, { token: a.token });
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let code = ""; for (const x of randomBytes(10)) code += A[x % 32];
+  await ctx.runMutation(internal.authDb.setCadetCode, { cadetId: a.cadetId, hash: createHash("sha256").update(code).digest("hex"), actor });
+  return { code }; } });
