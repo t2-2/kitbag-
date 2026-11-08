@@ -40,3 +40,8 @@ export const logout = mutation({ args: { token: v.string() }, handler: async (ct
   const s = await requireSession(ctx, a.token); await ctx.db.patch(s._id, { revoked: true });
   await ctx.db.insert("activityLogs", { actor: s.userId ?? s.cadetId ?? "?", action: "logout", details: s.role, createdAt: Date.now() });
 } });
+export const commanderName = internalQuery({ args: { token: v.string() }, handler: async (ctx, a) => {
+  const s = await requireSession(ctx, a.token, "commander"); return (await ctx.db.get(s.userId!))!.username; } });
+export const setCadetCode = internalMutation({ args: { cadetId: v.id("cadets"), hash: v.string(), actor: v.string() }, handler: async (ctx, a) => {
+  const now = Date.now(); await ctx.db.patch(a.cadetId, { accessCodeHash: a.hash, accessCodeExpires: now + 30 * 86400_000 });
+  await ctx.db.insert("activityLogs", { actor: a.actor, action: "issue_code", details: a.cadetId, createdAt: now }); } });
