@@ -16,8 +16,9 @@ export default defineSchema({
     shirtSize: v.optional(v.string()), pantsSize: v.optional(v.string()), shoeSize: v.optional(v.string()),
     jacketSize: v.optional(v.string()), active: v.boolean(), accessCodeHash: v.optional(v.string()),
     accessCodeExpires: v.optional(v.number()), initialSignedAt: v.optional(v.number()),
-    commanderNote: v.optional(v.string()), createdAt: v.number() })
-    .index("by_idNumber", ["idNumber"]).index("by_grade", ["grade"]),
+    commanderNote: v.optional(v.string()), email: v.optional(v.string()), createdAt: v.number() })
+    .index("by_email", ["email"]).index("by_idNumber", ["idNumber"]).index("by_grade", ["grade"]),
+  otps: defineTable({ cadetId: v.id("cadets"), codeHash: v.string(), expiresAt: v.number(), attempts: v.number(), used: v.boolean(), createdAt: v.number() }).index("by_cadet", ["cadetId"]),
   cadetEquipment: defineTable({ cadetId: v.id("cadets"), itemType: v.string(), size: v.string(), quantity: v.number() })
     .index("by_cadet", ["cadetId"]),
   inventory: defineTable({ itemType: v.string(), size: v.string(), quantity: v.number(), minThreshold: v.number() })
