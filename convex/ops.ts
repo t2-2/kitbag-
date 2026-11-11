@@ -2,6 +2,8 @@ import { v, ConvexError } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireSession } from "./lib/auth";
 import { genUsername } from "./lib/username";
+import { deleteCadetCascade } from "./lib/cadets";
+import { getSetting, putS } from "./promote";
 const GRADES = ["ט", "י", "יא", "יב"];
 const gradeV = v.union(v.literal("ט"), v.literal("י"), v.literal("יא"), v.literal("יב"));
 const range = (a: number, b: number, s = 2) => { const r: string[] = []; for (let i = a; i <= b; i += s) r.push(String(i)); return r; };
@@ -20,13 +22,7 @@ export const cadetsList = query({ args: { token: v.string(), grade: v.optional(g
   return rows.sort((x, y) => x.lastName.localeCompare(y.lastName, "he")).map((c) => ({ _id: c._id, firstName: c.firstName, lastName: c.lastName, username: c.username, email: c.email, grade: c.grade, signed: !!c.initialSignedAt, mailed: !!c.usernameSentAt })); } });
 export const cadetRemove = mutation({ args: { token: v.string(), ids: v.array(v.id("cadets")) }, handler: async (ctx, a) => {
   const s = await requireSession(ctx, a.token, "commander"); if (a.ids.length > 100) throw bad("TOO_MANY");
-  for (const id of a.ids) { const c = await ctx.db.get(id); if (!c) continue;
-    for (const t of ["sessions", "cadetEquipment"] as const) for (const r of await ctx.db.query(t).withIndex("by_cadet" as any, (q: any) => q.eq(t === "sessions" ? "cadetId" : "cadetId", id)).collect()) await ctx.db.delete(r._id);
-    for (const r of await ctx.db.query("requests").withIndex("by_cadet", (q) => q.eq("cadetId", id)).collect()) {
-      for (const i of await ctx.db.query("requestItems").withIndex("by_request", (q) => q.eq("requestId", r._id)).collect()) await ctx.db.delete(i._id);
-      for (const g of await ctx.db.query("signatures").withIndex("by_request", (q) => q.eq("requestId", r._id)).collect()) await ctx.db.delete(g._id); await ctx.db.delete(r._id); }
-    for (const g of await ctx.db.query("signatures").withIndex("by_cadet", (q) => q.eq("cadetId", id)).collect()) await ctx.db.delete(g._id);
-    await ctx.db.delete(id); await log(ctx, await actor(ctx, s), "cadet_delete", c.username ?? String(c._id)); } } });
+  for (const id of a.ids) { const u = await deleteCadetCascade(ctx, id); if (u) await log(ctx, await actor(ctx, s), "cadet_delete", u); } } });
 export const cadetMove = mutation({ args: { token: v.string(), ids: v.array(v.id("cadets")), grade: gradeV }, handler: async (ctx, a) => {
   const s = await requireSession(ctx, a.token, "commander"); for (const id of a.ids.slice(0, 100)) await ctx.db.patch(id, { grade: a.grade });
   await log(ctx, await actor(ctx, s), "cadet_move", `${a.ids.length}→${a.grade}`); } });
@@ -96,3 +92,8 @@ export const notifRead = mutation({ args: { token: v.string() }, handler: async 
   for (const n of await ctx.db.query("notifications").collect()) if (n.forCommanders && !n.read) await ctx.db.patch(n._id, { read: true }); } });
 export const thresholdSet = mutation({ args: { token: v.string(), itemType: v.string(), size: v.string(), min: v.number() }, handler: async (ctx, a) => {
   await requireSession(ctx, a.token, "commander"); const r = await hasSize(ctx, a.itemType, a.size); if (!r || a.min < 0 || a.min > 1000) throw bad("BAD_AMOUNT"); await ctx.db.patch(r._id, { minThreshold: Math.floor(a.min) }); } });
+
+export const promotionStatus = query({ args: { token: v.string() }, handler: async (ctx, a) => { await requireSession(ctx, a.token, "commander");
+  return { enabled: (await getSetting(ctx, "promotionEnabled")) !== false, lastYear: (await getSetting(ctx, "promotionLastYear")) ?? null }; } });
+export const promotionSet = mutation({ args: { token: v.string(), enabled: v.boolean() }, handler: async (ctx, a) => {
+  const s = await requireSession(ctx, a.token, "commander"); await putS(ctx, "promotionEnabled", a.enabled); await log(ctx, await actor(ctx, s), a.enabled ? "promotion_enable" : "promotion_disable", ""); } });
