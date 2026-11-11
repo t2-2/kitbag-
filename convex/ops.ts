@@ -43,7 +43,8 @@ export const inventoryAdjust = mutation({ args: { token: v.string(), itemType: v
   return next; } });
 export const dashboardStats = query({ args: { token: v.string() }, handler: async (ctx, a) => {
   await requireSession(ctx, a.token, "commander"); const cadets = await ctx.db.query("cadets").collect(), inv = await ctx.db.query("inventory").collect();
-  const byGrade: Record<string, number> = {}; for (const g of GRADES) byGrade[g] = cadets.filter((c) => c.grade === g).length;
+  const GK: Record<string, string> = { "ט": "g9", "י": "g10", "יא": "g11", "יב": "g12" }; // מפתחות אובייקט ב-Convex חייבים להיות ASCII
+  const byGrade: Record<string, number> = {}; for (const g of GRADES) byGrade[GK[g]] = cadets.filter((c) => c.grade === g).length;
   const reqs = await ctx.db.query("requests").collect(), st: Record<string, number> = {}; for (const r of reqs) st[r.status] = (st[r.status] ?? 0) + 1;
   return { inv: inv.length, total: cadets.length, byGrade, requests: st, low: inv.filter((r) => r.quantity <= r.minThreshold).map((r) => ({ itemType: r.itemType, size: r.size, quantity: r.quantity })).slice(0, 30) }; } });
 
