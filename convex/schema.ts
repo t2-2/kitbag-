@@ -12,12 +12,12 @@ export default defineSchema({
     .index("by_tokenHash", ["tokenHash"]).index("by_user", ["userId"]).index("by_cadet", ["cadetId"]),
   loginAttempts: defineTable({ key: v.string(), count: v.number(), windowStart: v.number(),
     lockedUntil: v.number() }).index("by_key", ["key"]),
-  cadets: defineTable({ firstName: v.string(), lastName: v.string(), idNumber: v.string(), grade,
+  cadets: defineTable({ firstName: v.string(), lastName: v.string(), idNumber: v.optional(v.string()), username: v.optional(v.string()), usernameSentAt: v.optional(v.number()), grade,
     shirtSize: v.optional(v.string()), pantsSize: v.optional(v.string()), shoeSize: v.optional(v.string()),
     jacketSize: v.optional(v.string()), active: v.boolean(), accessCodeHash: v.optional(v.string()),
     accessCodeExpires: v.optional(v.number()), initialSignedAt: v.optional(v.number()),
     commanderNote: v.optional(v.string()), email: v.optional(v.string()), createdAt: v.number() })
-    .index("by_email", ["email"]).index("by_idNumber", ["idNumber"]).index("by_grade", ["grade"]),
+    .index("by_email", ["email"]).index("by_username", ["username"]).index("by_grade", ["grade"]),
   otps: defineTable({ cadetId: v.id("cadets"), codeHash: v.string(), expiresAt: v.number(), attempts: v.number(), used: v.boolean(), createdAt: v.number() }).index("by_cadet", ["cadetId"]),
   cadetEquipment: defineTable({ cadetId: v.id("cadets"), itemType: v.string(), size: v.string(), quantity: v.number() })
     .index("by_cadet", ["cadetId"]),

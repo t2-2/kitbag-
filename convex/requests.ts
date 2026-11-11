@@ -20,11 +20,11 @@ export const create = mutation({ args: { token: v.string(), kind: v.union(v.lite
   for (const i of a.items) { if (!TYPES.includes(i.itemType) || !Number.isInteger(i.quantity) || i.quantity < 1 || i.quantity > 5 || !(await row(ctx, i.itemType, i.size))) throw bad("BAD_ITEMS"); }
   const id = await ctx.db.insert("requests", { cadetId: c._id, kind: a.kind, status: "pending", idempotencyKey: a.key, createdAt: Date.now() });
   for (const i of a.items) await ctx.db.insert("requestItems", { requestId: id, itemType: i.itemType, size: i.size, quantity: i.quantity, reason: i.reason.slice(0, 200) });
-  await note(ctx, undefined, "בקשה חדשה", `${c.lastName} ${c.firstName}`); await log(ctx, c.idNumber, "request_create", id); return id; } });
+  await note(ctx, undefined, "בקשה חדשה", `${c.lastName} ${c.firstName}`); await log(ctx, (c.username ?? String(c._id)), "request_create", id); return id; } });
 
 export const cancel = mutation({ args: { token: v.string(), requestId: v.id("requests") }, handler: async (ctx, a) => {
   const { c } = await cadetOf(ctx, a.token); const r = await ctx.db.get(a.requestId);
-  if (!r || r.cadetId !== c._id || r.status !== "pending") throw bad("BAD_STATE"); await ctx.db.patch(r._id, { status: "cancelled" }); await log(ctx, c.idNumber, "request_cancel", r._id); } });
+  if (!r || r.cadetId !== c._id || r.status !== "pending") throw bad("BAD_STATE"); await ctx.db.patch(r._id, { status: "cancelled" }); await log(ctx, (c.username ?? String(c._id)), "request_cancel", r._id); } });
 
 const withItems = async (ctx: any, r: any) => (await ctx.db.query("requestItems").withIndex("by_request", (q: any) => q.eq("requestId", r._id)).collect())
   .map((i: any) => ({ id: i._id, itemType: i.itemType, size: i.size, quantity: i.quantity, reason: i.reason, approvedSize: i.approvedSize, approvedQty: i.approvedQty }));
@@ -59,19 +59,19 @@ export const sign = mutation({ args: { token: v.string(), requestId: v.id("reque
     const size = i.approvedSize ?? i.size, qty = i.approvedQty ?? i.quantity, inv = await row(ctx, i.itemType, size);
     if (!inv || inv.quantity < qty) throw bad("NO_STOCK");
     await ctx.db.patch(inv._id, { quantity: inv.quantity - qty });
-    await ctx.db.insert("inventoryTransactions", { itemType: i.itemType, size, delta: -qty, balanceAfter: inv.quantity - qty, reason: "issue", actor: c.idNumber, requestId: r._id, createdAt: now });
+    await ctx.db.insert("inventoryTransactions", { itemType: i.itemType, size, delta: -qty, balanceAfter: inv.quantity - qty, reason: "issue", actor: (c.username ?? String(c._id)), requestId: r._id, createdAt: now });
     if (r.kind === "replace") { let left = qty; for (const h of held.filter((x) => x.itemType === i.itemType && x.size !== size)) { const d = Math.min(left, h.quantity); if (d > 0) { await ctx.db.patch(h._id, { quantity: h.quantity - d }); h.quantity -= d; left -= d; } } }
     const same = held.find((x) => x.itemType === i.itemType && x.size === size);
     if (same) { await ctx.db.patch(same._id, { quantity: same.quantity + qty }); same.quantity += qty; } else held.push({ _id: await ctx.db.insert("cadetEquipment", { cadetId: c._id, itemType: i.itemType, size, quantity: qty }) } as any);
   }
   await ctx.db.insert("signatures", { cadetId: c._id, kind: "request", requestId: r._id, image: a.image, signedAt: now });
-  await ctx.db.patch(r._id, { status: "completed", completedAt: now }); await log(ctx, c.idNumber, "request_sign", r._id); } });
+  await ctx.db.patch(r._id, { status: "completed", completedAt: now }); await log(ctx, (c.username ?? String(c._id)), "request_sign", r._id); } });
 
 export const signInitial = mutation({ args: { token: v.string(), image: v.string() }, handler: async (ctx, a) => {
   const { c } = await cadetOf(ctx, a.token); if (c.initialSignedAt) throw bad("BAD_STATE"); if (!okImg(a.image)) throw bad("BAD_SIGNATURE"); const now = Date.now();
   const kit: [string, string, number][] = [["shirt", c.shirtSize ?? "—", 3], ["pants", c.pantsSize ?? "—", 3], ["shoes", c.shoeSize ?? "—", 1], ["belt", "סטנדרט", 1], ["beret", "סטנדרט", 1], ["shoulder", "סטנדרט", 1], ["badge", "סטנדרט", 1], ["kitbag", "סטנדרט", 1]];
   for (const [itemType, size, quantity] of kit) await ctx.db.insert("cadetEquipment", { cadetId: c._id, itemType, size, quantity });
-  await ctx.db.insert("signatures", { cadetId: c._id, kind: "initial", image: a.image, signedAt: now }); await ctx.db.patch(c._id, { initialSignedAt: now }); await log(ctx, c.idNumber, "sign_initial", c._id); } });
+  await ctx.db.insert("signatures", { cadetId: c._id, kind: "initial", image: a.image, signedAt: now }); await ctx.db.patch(c._id, { initialSignedAt: now }); await log(ctx, (c.username ?? String(c._id)), "sign_initial", c._id); } });
 export const cadetHome = query({ args: { token: v.string() }, handler: async (ctx, a) => {
   const { c } = await cadetOf(ctx, a.token); const eq = await ctx.db.query("cadetEquipment").withIndex("by_cadet", (q) => q.eq("cadetId", c._id)).collect();
   const ns = (await ctx.db.query("notifications").withIndex("by_cadet", (q) => q.eq("cadetId", c._id)).collect()).sort((x, y) => y.createdAt - x.createdAt).slice(0, 5);
